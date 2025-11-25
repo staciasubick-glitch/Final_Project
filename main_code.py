@@ -149,13 +149,57 @@ class Checkers(QMainWindow):
         drag.exec_(Qt.MoveAction)
 
     def finish_drag(self, old_row, old_col, new_row, new_col):
-        piece = self.board[old_row][old_col]
-        if piece is None:
+        if not self.is_valid_move(old_row, old_col, new_row, new_col):
+            print("Invalid move!")
             return
 
+        piece = self.board[old_row][old_col]
+
+        # Check if captured:
+        if abs(new_row - old_row) == 2:
+            mid_row = (old_row + new_row) // 2
+            mid_col = (old_col + new_col) // 2
+            self.board[mid_row][mid_col] = None  # remove captured piece
+
+        # Move piece
         self.board[old_row][old_col] = None
         self.board[new_row][new_col] = piece
+
         self.update_board()
+
+    def is_valid_move(self, old_row, old_col, new_row, new_col):
+        piece = self.board[old_row][old_col]
+        if piece is None:
+            return False
+
+        # cannot move onto an occupied square
+        if self.board[new_row][new_col] is not None:
+            return False
+
+        direction = -1 if piece == "r" else 1  # red moves up (-1), black moves down (+1)
+
+        row_diff = new_row - old_row
+        col_diff = new_col - old_col
+
+        # ----------------------------
+        # 1. SIMPLE MOVE (1 step)
+        # ----------------------------
+        if row_diff == direction and abs(col_diff) == 1:
+            return True
+
+        # ----------------------------
+        # 2. CAPTURE MOVE (2 steps)
+        # ----------------------------
+        if row_diff == 2 * direction and abs(col_diff) == 2:
+            mid_row = (old_row + new_row) // 2
+            mid_col = (old_col + new_col) // 2
+            middle_piece = self.board[mid_row][mid_col]
+
+            # Can capture only the opposite color
+            if middle_piece is not None and middle_piece != piece:
+                return True
+
+        return False
 
 
 if __name__ == "__main__":
