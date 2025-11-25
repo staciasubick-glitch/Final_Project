@@ -15,24 +15,21 @@ class SquareButton(QPushButton):
         self.col = col
         self.setAcceptDrops(True)
 
-    def mouseMoveEvent(self, e):
-        if e.button() == Qt.LeftButton:
-            drag =QDrag(self)
-            mime = QMimeData()
-            drag.setMimeData(mime)
-            drag.exec_(Qt.MoveAction)
-
     def mousePressEvent(self, event):
-        # call the top-level window's start_drag
-        # window() returns the QMainWindow (your Checkers instance)
-        self.window().start_drag(self.row, self.col)
-        # call the base implementation so QPushButton internal state is correct
+        if event.button() == Qt.LeftButton:
+            self.window().start_drag(self.row, self.col, self)
         super().mousePressEvent(event)
 
-    def mouseReleaseEvent(self, event):
-        # call the top-level window's end_drag
-        self.window().end_drag(self.row, self.col)
-        super().mouseReleaseEvent(event)
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasText():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        data = event.mimeData().text()
+        old_row, old_col = map(int, data.split(","))
+        self.window().finish_drag(old_row, old_col, self.row, self.col)
+        event.acceptProposedAction()
+
 
 
 class Checkers(QMainWindow):
@@ -58,22 +55,6 @@ class Checkers(QMainWindow):
         # make visual board
         self.setup_gui()
 
-    def dragEnterEvent(self, e):
-        e.accept()
-
-    def dropEvent(self, e):
-        pos = e.pos()
-        widget = e.source()
-        for n in range(self.blayout.count()):
-            # Get the widget at each index in turn.
-            w = self.blayout.itemAt(n).widget()
-            if pos.x() < w.x() + w.size().width() // 2:
-                # We didn't drag past this widget.
-                # insert to the left of it.
-                self.blayout.insertWidget(n - 1, widget)
-                break
-
-        e.accept()
 
     def setup_board(self):
         """Creates an 8×8 array holding 'r', 'b', or None."""
@@ -147,27 +128,33 @@ class Checkers(QMainWindow):
         print(f"Clicked square ({row}, {col})")
 
     # DEBUG prints to confirm functions are called
-    def start_drag(self, row, col):
+    def start_drag(self, row, col, button):
         piece = self.board[row][col]
-        print("start_drag called for", (row, col), "piece:", piece)
         if piece is None:
             return
-        self.dragging_piece = piece
-        self.drag_start = (row, col)
 
-    def end_drag(self, row, col):
-        print("end_drag called for", (row, col), "dragging:", self.dragging_piece)
-        if self.dragging_piece is None:
+        drag = QDrag(button)
+        mime = QMimeData()
+
+        # encode starting location
+        mime.setText(f"{row},{col}")
+        drag.setMimeData(mime)
+
+        # show the checker piece while dragging
+        icon = button.icon()
+        pixmap = icon.pixmap(60, 60)
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(30, 30))
+
+        drag.exec_(Qt.MoveAction)
+
+    def finish_drag(self, old_row, old_col, new_row, new_col):
+        piece = self.board[old_row][old_col]
+        if piece is None:
             return
 
-        start_row, start_col = self.drag_start
-
-        # Move the piece (no validation here — you'll add rules later)
-        self.board[start_row][start_col] = None
-        self.board[row][col] = self.dragging_piece
-
-        self.dragging_piece = None
-        self.drag_start = None
+        self.board[old_row][old_col] = None
+        self.board[new_row][new_col] = piece
         self.update_board()
 
 
