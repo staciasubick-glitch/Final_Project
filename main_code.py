@@ -15,6 +15,13 @@ class SquareButton(QPushButton):
         self.col = col
         self.setAcceptDrops(True)
 
+    def mouseMoveEvent(self, e):
+        if e.button() == Qt.LeftButton:
+            drag =QDrag(self)
+            mime = QMimeData()
+            drag.setMimeData(mime)
+            drag.exec_(Qt.MoveAction)
+
     def mousePressEvent(self, event):
         # call the top-level window's start_drag
         # window() returns the QMainWindow (your Checkers instance)
@@ -50,6 +57,23 @@ class Checkers(QMainWindow):
 
         # make visual board
         self.setup_gui()
+
+    def dragEnterEvent(self, e):
+        e.accept()
+
+    def dropEvent(self, e):
+        pos = e.pos()
+        widget = e.source()
+        for n in range(self.blayout.count()):
+            # Get the widget at each index in turn.
+            w = self.blayout.itemAt(n).widget()
+            if pos.x() < w.x() + w.size().width() // 2:
+                # We didn't drag past this widget.
+                # insert to the left of it.
+                self.blayout.insertWidget(n - 1, widget)
+                break
+
+        e.accept()
 
     def setup_board(self):
         """Creates an 8×8 array holding 'r', 'b', or None."""
