@@ -52,6 +52,10 @@ class Checkers(QMainWindow):
         self.dragging_piece = None
         self.drag_start = None
 
+        #add logic to force multijump sequence if available
+        self.must_continue_jump = False #switches to true when player must continue jump sequence
+        self.active_piece = None #coord of piece that has to continue jumping
+
         # create game board array
         self.board = self.setup_board()
 
@@ -156,12 +160,22 @@ class Checkers(QMainWindow):
         '''define button behavior when piece is clicked and dragged'''
         self.reset_highlights()
 
+        # If a multi-jump is required, only allow dragging the active piece
+        if self.must_continue_jump and self.active_piece != (row, col):
+            return
+
         piece = self.board[row][col]
         if piece is None:
             return
 
-        #add highlights for valid moves
+        # otherwise highlight all valid moves
         moves = self.find_valid_moves(row, col)
+
+        # If we're in multi-jump state, only highlight capture moves
+        if self.must_continue_jump:
+            moves = [m for m in moves if abs(m[0] - row) == 2]
+
+        # add highlights for valid moves
         self.create_highlights(moves)
 
         drag = QDrag(button)
@@ -190,11 +204,13 @@ class Checkers(QMainWindow):
 
         piece = self.board[old_row][old_col]
 
+        captured = False
         # Check if captured:
         if abs(new_row - old_row) == 2:
             mid_row = (old_row + new_row) // 2
             mid_col = (old_col + new_col) // 2
             self.board[mid_row][mid_col] = None  # remove captured piece
+            captured = True
 
         # Move piece
         self.board[old_row][old_col] = None
@@ -207,6 +223,26 @@ class Checkers(QMainWindow):
         # if black reaches bottom row it becomes a king
         if piece == "b" and new_row == 7:
             self.board[new_row][new_col] = "B"
+
+        # If a capture occurred, check for further captures from the landing square
+        if captured:
+            followups = self.find_valid_moves(new_row, new_col)
+            # Only keep capture-type followups (jumps of two rows)
+            capture_followups = [m for m in followups if abs(m[0] - new_row) == 2]
+
+            if capture_followups:
+                # Multi-jump must continue with this piece
+                self.must_continue_jump = True
+                self.active_piece = (new_row, new_col)
+                # highlight the capture followups only
+                self.create_highlights(capture_followups)
+                # update board visually (piece moved and captured removed)
+                self.update_board()
+                return  # do not end turn; user must continue jumping
+
+        # No further captures → clear multi-jump state and finish turn
+        self.must_continue_jump = False
+        self.active_piece = None
 
         self.update_board()
 
@@ -241,7 +277,7 @@ class Checkers(QMainWindow):
             #find middle square
             mr = row +dr
             mc= col +dc
-            if 0 <= nr < 8 and 0<= nc < 8:
+            if (0 <= nr < 8 and 0 <= nc < 8) and (0 <= mr < 8 and 0 <= mc < 8):
                 middle_checker = self.board[mr][mc]
                 #check is middle piece exists and if its the same color as jumping piece
                 if (middle_checker is not None and middle_checker.lower() != piece.lower()
@@ -249,9 +285,22 @@ class Checkers(QMainWindow):
                     moves.append((nr,nc))
 
         return moves
-    def create_highlights(self, moves):
+
+    def create_highlights(self, moves, capture_only=False):
+        """
+        moves: list of (r,c)
+        If capture_only True OR a move is a capture (abs row diff == 2), color red, else yellow.
+        """
         for (r, c) in moves:
-            self.buttons[r][c].setStyleSheet("background-color: yellow;")
+            # detect if this move is a capture relative to current active piece
+            is_capture = False
+            if self.active_piece:
+                ar, ac = self.active_piece
+                if abs(r - ar) == 2:
+                    is_capture = True
+
+            color = "green" if is_capture else "yellow"
+            self.buttons[r][c].setStyleSheet(f"background-color: {color};")
 
 
     def reset_highlights(self):
