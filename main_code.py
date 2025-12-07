@@ -33,6 +33,9 @@ class SquareButton(QPushButton):
 
 
 class Checkers(QMainWindow):
+    '''
+    main class defining the GUI window and the functions that define how pieces move
+    '''
     def __init__(self):
         super(Checkers, self).__init__()
         self.setWindowTitle("Checkers")
@@ -52,14 +55,16 @@ class Checkers(QMainWindow):
         # create game board array
         self.board = self.setup_board()
 
-        # make visual board
+        # call function to set up board visual
         self.setup_gui()
 
 
     def setup_board(self):
-        """Creates an 8×8 array holding 'r', 'b', or None."""
+        """Creates an 8×8 array holding 'r' or 'b' that creates the colors of the checkers."""
+        #initialize empty list of board spaces
         board = [[None for _ in range(8)] for _ in range(8)]
 
+        #assign colors to pieces
         for row in range(8):
             for col in range(8):
                 is_dark = (row + col) % 2 == 1
@@ -71,11 +76,10 @@ class Checkers(QMainWindow):
         return board
 
     def setup_gui(self):
-        """Creates 8×8 buttons that act as checkerboard squares."""
+        """Creates buttons that act as checkerboard squares."""
         for row in range(8):
             row_buttons = []
             for col in range(8):
-                # IMPORTANT: parent should be the central widget (not the QMainWindow)
                 button = SquareButton(row, col, parent=self.central_widget)
                 button.setFixedSize(70, 70)
 
@@ -96,7 +100,7 @@ class Checkers(QMainWindow):
         self.update_board()
 
     def update_board(self):
-        """Place icons on the board according to self.board."""
+        """Place icons on the board according to the array defined in by self.board."""
         for row in range(8):
             for col in range(8):
                 piece = self.board[row][col]
@@ -105,30 +109,51 @@ class Checkers(QMainWindow):
                 if piece is None:
                     button.setIcon(QIcon())
                 else:
-                    icon = self.create_piece_icon("red" if piece == "r" else "black")
+                    icon = self.create_piece_icon(piece)
                     button.setIcon(QIcon(icon))
                     button.setIconSize(QSize(60, 60))
 
-    def create_piece_icon(self, color, size=60):
+    def create_piece_icon(self, piece, size=60):
+        ''' create circular icon to represent checkers piece'''
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
 
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        brush_color = QColor(200, 30, 30) if color == "red" else QColor(30, 30, 30)
+        color = piece.lower()
+        brush_color = QColor(200, 30, 30) if color == "r" else QColor(30, 30, 30)
         painter.setBrush(brush_color)
         painter.setPen(Qt.NoPen)
         painter.drawEllipse(0, 0, size, size)
+
+        #draw a crown if piece is a king
+        if piece.isupper():
+            yellow=QColor(255, 215, 0)
+            painter.setPen(QPen(yellow))
+            painter.setBrush(QBrush(yellow))
+
+            crown = QPolygon([
+                QPoint(int(size * 0.25), int(size * 0.55)),  # left base
+                QPoint(int(size * 0.33), int(size * 0.30)),  # left spike
+
+                QPoint(int(size * 0.50), int(size * 0.20)),  # middle spike (tallest)
+
+                QPoint(int(size * 0.67), int(size * 0.30)),  # right spike
+                QPoint(int(size * 0.75), int(size * 0.55)),  # right base
+            ])
+            painter.drawPolygon(crown)
         painter.end()
 
         return pixmap
 
     def on_square_clicked(self, row, col):
+        '''function prints the coordinates of square that was clicked'''
         print(f"Clicked square ({row}, {col})")
 
     # DEBUG prints to confirm functions are called
     def start_drag(self, row, col, button):
+        '''define button behavior when piece is clicked and dragged'''
         piece = self.board[row][col]
         if piece is None:
             return
@@ -149,6 +174,7 @@ class Checkers(QMainWindow):
         drag.exec_(Qt.MoveAction)
 
     def finish_drag(self, old_row, old_col, new_row, new_col):
+        '''define button behavior when piece is released'''
         if not self.is_valid_move(old_row, old_col, new_row, new_col):
             print("Invalid move!")
             return
@@ -165,6 +191,14 @@ class Checkers(QMainWindow):
         self.board[old_row][old_col] = None
         self.board[new_row][new_col] = piece
 
+        # if red reaches top row it becomes a king
+        if piece == "r" and new_row == 0:
+            self.board[new_row][new_col] = "R"
+
+        # if black reaches bottom row it becomes a king
+        if piece == "b" and new_row == 7:
+            self.board[new_row][new_col] = "B"
+
         self.update_board()
 
     def is_valid_move(self, old_row, old_col, new_row, new_col):
@@ -176,27 +210,29 @@ class Checkers(QMainWindow):
         if self.board[new_row][new_col] is not None:
             return False
 
-        direction = -1 if piece == "r" else 1  # red moves up (-1), black moves down (+1)
+        # decide allowed movement directions
+        if piece == "r":  # red man
+            allowed_rows = (-1,)
+        elif piece == "b":  # black man
+            allowed_rows = (1,)
+        else:  # "R" or "B" = king
+            allowed_rows = (-1, 1) #kings can move forward and backwards
 
         row_diff = new_row - old_row
         col_diff = new_col - old_col
 
-        # ----------------------------
-        # 1. SIMPLE MOVE (1 step)
-        # ----------------------------
-        if row_diff == direction and abs(col_diff) == 1:
+        # single move forward
+        if row_diff in allowed_rows and abs(col_diff) == 1:
             return True
 
-        # ----------------------------
-        # 2. CAPTURE MOVE (2 steps)
-        # ----------------------------
-        if row_diff == 2 * direction and abs(col_diff) == 2:
+        # two rows forward (capture move)
+        if row_diff in tuple(d*2 for d in allowed_rows) and abs(col_diff) == 2:
             mid_row = (old_row + new_row) // 2
             mid_col = (old_col + new_col) // 2
             middle_piece = self.board[mid_row][mid_col]
 
             # Can capture only the opposite color
-            if middle_piece is not None and middle_piece != piece:
+            if middle_piece is not None and middle_piece.lower() != piece.lower():
                 return True
 
         return False
