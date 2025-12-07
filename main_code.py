@@ -135,11 +135,11 @@ class Checkers(QMainWindow):
 
             crown = QPolygon([
                 QPoint(int(size * 0.25), int(size * 0.55)),  # left base
-                QPoint(int(size * 0.33), int(size * 0.30)),  # left spike
+                QPoint(int(size * 0.25), int(size * 0.20)),  # left spike
 
                 QPoint(int(size * 0.50), int(size * 0.20)),  # middle spike (tallest)
 
-                QPoint(int(size * 0.67), int(size * 0.30)),  # right spike
+                QPoint(int(size * 0.75), int(size * 0.20)),  # right spike
                 QPoint(int(size * 0.75), int(size * 0.55)),  # right base
             ])
             painter.drawPolygon(crown)
@@ -154,9 +154,15 @@ class Checkers(QMainWindow):
     # DEBUG prints to confirm functions are called
     def start_drag(self, row, col, button):
         '''define button behavior when piece is clicked and dragged'''
+        self.reset_highlights()
+
         piece = self.board[row][col]
         if piece is None:
             return
+
+        #add highlights for valid moves
+        moves = self.find_valid_moves(row, col)
+        self.create_highlights(moves)
 
         drag = QDrag(button)
         mime = QMimeData()
@@ -175,6 +181,9 @@ class Checkers(QMainWindow):
 
     def finish_drag(self, old_row, old_col, new_row, new_col):
         '''define button behavior when piece is released'''
+        #clear highlights after move finishes
+        self.reset_highlights()
+
         if not self.is_valid_move(old_row, old_col, new_row, new_col):
             print("Invalid move!")
             return
@@ -200,6 +209,60 @@ class Checkers(QMainWindow):
             self.board[new_row][new_col] = "B"
 
         self.update_board()
+
+    def find_valid_moves(self, row, col):
+        moves = []
+        piece =self.board[row][col]
+        if piece is None:
+            return moves
+
+        #assign movement direction
+        if piece == 'r':
+            directions = [(-1, -1), (-1, 1)]
+        elif piece == 'b':
+            directions = [(1, -1), (1, 1)]
+        else: #kings can move up and down
+            directions = [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+        #test single step moves
+        for dr, dc in directions:
+            #assign coords of potential moves
+            nr = row +dr
+            nc= col +dc
+            #check if move is on the board and an empty spot
+            if 0 <= nr < 8 and 0<= nc< 8:
+                if self.board[nr][nc] is None:
+                    moves.append((nr,nc))
+
+        #test capturing moves
+        for dr, dc in directions:
+            nr = row +2*dr
+            nc= col+2*dc
+            #find middle square
+            mr = row +dr
+            mc= col +dc
+            if 0 <= nr < 8 and 0<= nc < 8:
+                middle_checker = self.board[mr][mc]
+                #check is middle piece exists and if its the same color as jumping piece
+                if (middle_checker is not None and middle_checker.lower() != piece.lower()
+                    and self.board[nr][nc] is None):
+                    moves.append((nr,nc))
+
+        return moves
+    def create_highlights(self, moves):
+        for (r, c) in moves:
+            self.buttons[r][c].setStyleSheet("background-color: yellow;")
+
+
+    def reset_highlights(self):
+        for row in range(8):
+            for col in range(8):
+                button = self.buttons[row][col]
+                if (row +col)%2 == 0:
+                    button.setStyleSheet("background-color: tan;")
+                else:
+                    button.setStyleSheet("background-color: saddlebrown;")
+
 
     def is_valid_move(self, old_row, old_col, new_row, new_col):
         piece = self.board[old_row][old_col]
