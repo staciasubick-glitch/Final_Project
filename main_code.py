@@ -44,8 +44,15 @@ class Checkers(QMainWindow):
         # central widget + layout
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
         self.grid_layout = QGridLayout(self.central_widget)
         self.grid_layout.setSpacing(0)
+        self.main_layout.addLayout(self.grid_layout)
+
+        # --- Restart button ---
+        self.restart_button = QPushButton("Restart Game")
+        self.restart_button.clicked.connect(self.restart_game)
+        self.main_layout.addWidget(self.restart_button)
 
         # initialize buttons and drag state
         self.buttons = []
@@ -61,6 +68,11 @@ class Checkers(QMainWindow):
 
         # call function to set up board visual
         self.setup_gui()
+
+        #start turns with red pieces
+        self.current_player = 'r'
+
+        self.game_over = False
 
 
     def setup_board(self):
@@ -155,7 +167,6 @@ class Checkers(QMainWindow):
         '''function prints the coordinates of square that was clicked'''
         print(f"Clicked square ({row}, {col})")
 
-    # DEBUG prints to confirm functions are called
     def start_drag(self, row, col, button):
         '''define button behavior when piece is clicked and dragged'''
         self.reset_highlights()
@@ -166,6 +177,10 @@ class Checkers(QMainWindow):
 
         piece = self.board[row][col]
         if piece is None:
+            return
+
+        # check if piece matches current player
+        if piece.lower() != self.current_player:
             return
 
         # otherwise highlight all valid moves
@@ -243,6 +258,11 @@ class Checkers(QMainWindow):
         # No further captures → clear multi-jump state and finish turn
         self.must_continue_jump = False
         self.active_piece = None
+
+        # Switch players
+        self.current_player = 'b' if self.current_player == 'r' else 'r'
+        # Check if the next player has lost
+        self.check_if_winner()
 
         self.update_board()
 
@@ -349,6 +369,71 @@ class Checkers(QMainWindow):
 
         return False
 
+    def check_if_winner(self):
+        '''function to check if either player has won (either run out of pieces or no legal moves)'''
+        red_exists = False
+        black_exists = False
+        red_legal_moves = False
+        black_legal_moves = False
+
+        for r in range (8):
+            for c in range(8):
+                piece = self.board[r][c]
+
+                #continue on if no piece in the square
+                if piece is None:
+                    continue
+                #test if piece exists
+                if piece.lower() == 'r':
+                    red_exists = True
+                if piece.lower() == 'b':
+                    black_exists = True
+
+                #test if there are legal moves
+                moves = self.find_valid_moves(r, c)
+                if moves:
+                    if piece.lower() == 'r':
+                        red_legal_moves = True
+                    if piece.lower() =='b':
+                        black_legal_moves = True
+
+        #check for winning conditions
+        if not red_exists or not red_legal_moves:
+            self.show_winning_message("Black")
+            return True
+        if not black_exists or not black_legal_moves:
+            self.show_winning_message("Red")
+            return True
+
+        return False
+
+    def show_winning_message(self, winner):
+        msg = QMessageBox()
+        msg.setWindowTitle("Game Over")
+        msg.setText(f"{winner} wins!")
+        msg.exec_()
+
+        self.game_over = True
+
+    def restart_game(self):
+        """Reset pieces, turn order, states, and UI."""
+        # 1. Reset the board array
+        self.board = self.setup_board()
+
+        # 2. Reset game state
+        self.current_player = 'r'
+        self.must_continue_jump = False
+        self.active_piece = None
+        self.game_over = False
+
+        # 3. Reset visual highlights
+        self.reset_highlights()
+
+        # 4. Update all piece icons
+        self.update_board()
+
+        # (Optional) Print for debugging
+        print("Game restarted.")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
