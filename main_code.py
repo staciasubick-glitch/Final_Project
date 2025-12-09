@@ -9,22 +9,73 @@ from PyQt5.QtCore import *
 import numpy as np
 
 class SquareButton(QPushButton):
+    '''
+     """
+    A QPushButton subclass representing a single square on the checkers board.
+
+    Each SquareButton knows its board coordinates (row, col) and supports
+    drag-and-drop behavior so that checkers pieces can be moved by dragging.
+    The actual game-logic for validating moves is handled by the parent
+    Checkers window; this class only forwards UI events to it.
+    '''
     def __init__(self, row, col, parent=None):
+        """
+               Initialize a SquareButton at a specific board position.
+
+               Parameters
+               ---------
+                   row (int): Row index of the square.
+                   col (int): Column index of the square.
+                   parent (QWidget, optional): Parent widget.
+               """
         super().__init__(parent)
         self.row = row
         self.col = col
         self.setAcceptDrops(True)
 
     def mousePressEvent(self, event):
+        """
+              Handle mouse press events to start dragging a checker piece.
+
+              If the user left-clicks this square, the method notifies the parent
+              window (Checkers class) to attempt starting a drag operation from this
+              square.
+
+              Parameters
+              ---------
+                  event (QMouseEvent): The mouse event object.
+              """
         if event.button() == Qt.LeftButton:
             self.window().start_drag(self.row, self.col, self)
         super().mousePressEvent(event)
 
     def dragEnterEvent(self, event):
+        """
+                Handle drag entering this square.
+
+                The drag is accepted if the incoming mime data contains text, which
+                is how the Checkers class encodes the source coordinates of the piece
+                being dragged.
+
+                Parameters
+                ---------
+                    event (QDragEnterEvent): The drag event object.
+                """
         if event.mimeData().hasText():
             event.acceptProposedAction()
 
     def dropEvent(self, event):
+        """
+                Handle dropping a dragged checker piece onto this square.
+
+                The method reads the old coordinates stored in the drag mime data and
+                calls the parent window's `finish_drag` method to attempt completing
+                the move.
+
+                Parameters
+                ---------
+                    event (QDropEvent): The drop event containing drag data.
+                """
         data = event.mimeData().text()
         old_row, old_col = map(int, data.split(","))
         self.window().finish_drag(old_row, old_col, self.row, self.col)
@@ -37,6 +88,7 @@ class Checkers(QMainWindow):
     main class defining the GUI window and the functions that define how pieces move
     '''
     def __init__(self):
+        '''Initializes the attributes of each 'checkers' instance'''
         super(Checkers, self).__init__()
         self.setWindowTitle("Checkers")
         self.setGeometry(300, 300, 600, 600)
@@ -76,7 +128,12 @@ class Checkers(QMainWindow):
 
 
     def setup_board(self):
-        """Creates an 8×8 array holding 'r' or 'b' that creates the colors of the checkers."""
+        """Creates an 8×8 array holding 'r' or 'b' that creates the colors of the checkers.
+
+        Returns
+        -------
+        board
+            list containing color assignments for checkers pieces: 'r','b' or None if no piece"""
         #initialize empty list of board spaces
         board = [[None for _ in range(8)] for _ in range(8)]
 
@@ -92,7 +149,11 @@ class Checkers(QMainWindow):
         return board
 
     def setup_gui(self):
-        """Creates buttons that act as checkerboard squares."""
+        """Creates buttons that act as checkerboard squares.
+        Returns
+        -------
+        None
+        """
         for row in range(8):
             row_buttons = []
             for col in range(8):
@@ -116,7 +177,13 @@ class Checkers(QMainWindow):
         self.update_board()
 
     def update_board(self):
-        """Place icons on the board according to the array defined in by self.board."""
+        """Place icons on the board according to the array defined in by self.board.
+        updates visual based on moves.
+
+        Returns
+        -------
+        None
+        """
         for row in range(8):
             for col in range(8):
                 piece = self.board[row][col]
@@ -130,7 +197,17 @@ class Checkers(QMainWindow):
                     button.setIconSize(QSize(60, 60))
 
     def create_piece_icon(self, piece, size=60):
-        ''' create circular icon to represent checkers piece'''
+        ''' create circular icon to represent checkers piece
+        and add yellow icon to represent king pieces
+
+        Parameters
+        ----------
+            piece: string containing piece color
+            size: int, size of checkers piece
+        Returns
+        -------
+        pixmap
+        '''
         pixmap = QPixmap(size, size)
         pixmap.fill(Qt.transparent)
 
@@ -163,12 +240,22 @@ class Checkers(QMainWindow):
 
         return pixmap
 
-    def on_square_clicked(self, row, col):
-        '''function prints the coordinates of square that was clicked'''
-        print(f"Clicked square ({row}, {col})")
+    # def on_square_clicked(self, row, col):
+    #     '''function prints the coordinates of square that was clicked for debugging'''
+    #     print(f"Clicked square ({row}, {col})")
 
     def start_drag(self, row, col, button):
-        '''define button behavior when piece is clicked and dragged'''
+        '''
+        define button behavior when piece is clicked and dragged.
+        Parameters
+            ----------
+            row: int
+            col: int
+            button: SquareButton
+        Returns
+        -------
+        None
+        '''
         self.reset_highlights()
 
         # If a multi-jump is required, only allow dragging the active piece
@@ -209,7 +296,21 @@ class Checkers(QMainWindow):
         drag.exec_(Qt.MoveAction)
 
     def finish_drag(self, old_row, old_col, new_row, new_col):
-        '''define button behavior when piece is released'''
+        '''define button behavior when piece is released
+        Parameters
+        ----------
+            old_row: int
+                original row index of piece
+            old_col: int
+                original column index of piece
+            new_row: int
+                new row index of piece
+            new_col: int
+                new column index of piece
+        Returns
+        -------
+        None
+        '''
         #clear highlights after move finishes
         self.reset_highlights()
 
@@ -267,6 +368,23 @@ class Checkers(QMainWindow):
         self.update_board()
 
     def find_valid_moves(self, row, col):
+        """
+            Compute all legal moves for the piece located at (row, col).
+
+            Parameters
+            ----------
+            row : int
+                The row index of the piece to evaluate (0–7).
+            col : int
+                The column index of the piece to evaluate (0–7).
+
+            Returns
+            -------
+            list of (int, int)
+                A list of coordinate tuples representing the legal destination
+                squares the piece may move to. Each tuple is (new_row, new_col).
+        """
+
         moves = []
         piece =self.board[row][col]
         if piece is None:
@@ -308,8 +426,14 @@ class Checkers(QMainWindow):
 
     def create_highlights(self, moves, capture_only=False):
         """
+        Parameters
+        ----------
         moves: list of (r,c)
         If capture_only True OR a move is a capture (abs row diff == 2), color red, else yellow.
+
+        Returns
+        -------
+        None
         """
         for (r, c) in moves:
             # detect if this move is a capture relative to current active piece
@@ -324,6 +448,13 @@ class Checkers(QMainWindow):
 
 
     def reset_highlights(self):
+        '''
+        resets highlighted squares to original colors
+
+        Returns
+        -------
+        None
+        '''
         for row in range(8):
             for col in range(8):
                 button = self.buttons[row][col]
@@ -334,6 +465,25 @@ class Checkers(QMainWindow):
 
 
     def is_valid_move(self, old_row, old_col, new_row, new_col):
+        '''
+        Checks if a move is valid
+
+        Parameters
+        ----------
+        old_row : int
+            original space row index
+        old_col : int
+            original space column index
+        new_row : int
+            new space row index
+        new_col : int
+            new space column index
+
+        Returns
+        -------
+        True or False
+            true if move is valid, false if not
+        '''
         piece = self.board[old_row][old_col]
         if piece is None:
             return False
@@ -370,7 +520,12 @@ class Checkers(QMainWindow):
         return False
 
     def check_if_winner(self):
-        '''function to check if either player has won (either run out of pieces or no legal moves)'''
+        '''function to check if either player has won (either run out of pieces or no legal moves)
+
+        Returns
+        -------
+        True or False
+        '''
         red_exists = False
         black_exists = False
         red_legal_moves = False
@@ -408,6 +563,13 @@ class Checkers(QMainWindow):
         return False
 
     def show_winning_message(self, winner):
+        '''
+        shows message box pop-up with which color won
+
+        Returns
+        -------
+        None
+        '''
         msg = QMessageBox()
         msg.setWindowTitle("Game Over")
         msg.setText(f"{winner} wins!")
@@ -416,7 +578,11 @@ class Checkers(QMainWindow):
         self.game_over = True
 
     def restart_game(self):
-        """Reset pieces, turn order, states, and UI."""
+        """Reset pieces, turn order, states, and UI.
+        Returns
+        -------
+        None
+        """
         # 1. Reset the board array
         self.board = self.setup_board()
 
