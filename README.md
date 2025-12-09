@@ -1,5 +1,5 @@
 🏁 Checkers (PyQt5 GUI)
-
+ 
 A playable Checkers game implemented in Python using PyQt5, supporting:
 -Drag-and-drop piece movement
 -Move highlighting
